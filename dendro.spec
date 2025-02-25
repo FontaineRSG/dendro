@@ -20,4 +20,5 @@ deps: {glibc}
 ./configure
 make
 make install DESTDIR=&dendro_buildroot/install
+libtool --finish &dendro_buildroot/install
 [/build-commands]
