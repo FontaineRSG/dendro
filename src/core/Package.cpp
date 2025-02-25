@@ -70,8 +70,12 @@ void Package::print(){
     printTree(conflicts, "Conflicts", ANSI_RED, "[C]");
     printTree(replaces, "Replaces", ANSI_MAGENTA, "[R]");
     printTree(build_deps, "Build dependencies", ANSI_BLUE, "[B]");
+
+    std::cout << "Package source: " << source << std::endl;
     std::cout << std::endl << "Pre-build script: " << std::endl;
     printColoredScript(pre_build_commands);
+    std::cout << std::endl << "Build script: " << std::endl;
+    printColoredScript(build_commands);
     std::cout << std::endl << "Post-build script: " << std::endl;
     printColoredScript(post_build_commands);
     std::cout << std::endl << "Pre-install script: " << std::endl;

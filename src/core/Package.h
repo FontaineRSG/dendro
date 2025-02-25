@@ -21,12 +21,14 @@ class Package {
     std::vector<std::string> conflicts;
     std::vector<std::string> replaces;
     std::vector<std::string> deps;
+    std::vector<std::string> build_commands;
     bool is_protected;
 
     std::vector<std::string> pre_build_commands;
     std::vector<std::string> post_build_commands;
     std::vector<std::string> pre_install_script, post_install_script;
     std::vector<std::string> pre_remove_script, post_remove_script;
+    std::string source;
     Package(
         std::string name,
         std::string author,
@@ -45,7 +47,8 @@ class Package {
         std::vector<std::string> pre_install_script,
         std::vector<std::string> post_install_script,
         std::vector<std::string> pre_remove_script,
-        std::vector<std::string> post_remove_script
+        std::vector<std::string> post_remove_script,
+        std::string source
     );
     Package(){};
 

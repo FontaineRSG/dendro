@@ -3,7 +3,7 @@ CXX = clang++
 CXXFLAGS = -std=c++23 -Wall -Wextra -g 
 
 INCLUDES = -I/usr/local/include -I/usr/include -Isrc/core -Isrc/parser -Isrc/utils
-LIBS =  -lstdc++fs -lstdc++
+LIBS =  -lstdc++fs -lstdc++ -lcurl
 LDFLAGS = -L/usr/local/lib
 
 # Source files

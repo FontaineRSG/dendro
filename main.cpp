@@ -1,11 +1,246 @@
 #include <iostream>
 #include <Parser.h>
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <spec-file>\n";
-        return 1;
+#include <iostream>
+#include <filesystem>
+#include <fstream>
+#include <cstdlib>
+#include <vector>
+#include "Package.h"
+#include "Parser.h"
+#include <curl/curl.h>
+
+namespace fs = std::filesystem;
+
+class BuildSystem {
+    Package pkg;
+    fs::path build_root;
+    fs::path anemo_pack_dir;
+    fs::path final_pkg_path;
+
+public:
+    explicit BuildSystem(const Package& package) : pkg(package) {
+        build_root = fs::path("/var/dendro") / pkg.name / "buildroot";
+        anemo_pack_dir = fs::path("/var/dendro") / pkg.name / "anemopack";
+        final_pkg_path = fs::current_path() / (pkg.name + "-" + pkg.version + ".apkg");
+    }
+    // TODO implement anemo list in Anemo pkg manager
+    bool checkDependencies() {
+        // std::cout << "Checking build dependencies...\n";
+        // for (const auto& dep : pkg.build_deps) {
+        //     int result = std::system(("anemo info " + dep + " > /dev/null 2>&1").c_str());
+        //     if (result != 0) {
+        //         std::cerr << "Missing build dependency: " << dep << "\n";
+        //         return false;
+        //     }
+        // }
+        return true;
     }
 
-    Parser::parseSpec(argv[1]).print();
+    void createBuildDirs() {
+        fs::create_directories(build_root);
+        fs::create_directories(anemo_pack_dir);
+        fs::create_directories(anemo_pack_dir / "package");
+    }
+
+    static size_t writeData(void* ptr, size_t size, size_t nmemb, FILE* stream) {
+        return fwrite(ptr, size, nmemb, stream);
+    }
+
+    void downloadAndPrepareSource() {
+        if (pkg.source.empty()) return;
+
+        // Check if source is local directory
+        if (fs::exists(pkg.source) && fs::is_directory(pkg.source)) {
+            fs::copy(pkg.source, build_root, fs::copy_options::recursive);
+            return;
+        }
+
+        // Handle URL source
+        CURL* curl = curl_easy_init();
+        if (curl) {
+            FILE* fp = fopen("temp_source.tar", "wb");
+
+            // Set curl options
+            curl_easy_setopt(curl, CURLOPT_URL, pkg.source.c_str());
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+
+            // Handle redirects like -L flag
+            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);  // Enable redirect following
+            curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);      // Maximum 10 redirects
+
+            // GitHub requires a user-agent header
+            struct curl_slist *headers = NULL;
+            headers = curl_slist_append(headers, "User-Agent: DendroBuildSystem");
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+            CURLcode res = curl_easy_perform(curl);
+
+            // Cleanup
+            curl_slist_free_all(headers);
+            fclose(fp);
+            curl_easy_cleanup(curl);
+
+            if (res == CURLE_OK) {
+                extractAndFlattenTarball();
+                fs::remove("temp_source.tar");
+            } else {
+                std::cerr << "Download failed: " << curl_easy_strerror(res) << "\n";
+                throw std::runtime_error("Source download failed");
+            }
+        }
+    }
+
+
+    void extractAndFlattenTarball() {
+        // Extract tarball
+        std::system(("tar xf temp_source.tar -C " + build_root.string()).c_str());
+        fs::remove("temp_source.tar.gz");
+
+        // Flatten directory structure
+        auto dir_iter = fs::directory_iterator(build_root);
+        std::vector<fs::path> dir_contents;
+
+        // Find all extracted items
+        for (const auto& entry : dir_iter) {
+            dir_contents.push_back(entry.path());
+        }
+
+        // If we only have one directory, move its contents up
+        if (dir_contents.size() == 1 && fs::is_directory(dir_contents[0])) {
+            const auto temp_dir = dir_contents[0];
+            for (const auto& entry : fs::directory_iterator(temp_dir)) {
+                fs::rename(entry.path(), build_root / entry.path().filename());
+            }
+            fs::remove(temp_dir);
+        }
+    }
+
+    void executeCommands(const std::vector<std::string>& commands, const std::string& phase) {
+        if (commands.empty()) return;
+
+        std::cout << "Executing " << phase << " commands...\n";
+
+        // Create temporary script in build root
+        const auto script_path = build_root / "dendro_build_script.sh";
+        {
+            std::ofstream script(script_path);
+            script << "#!/bin/sh\n"
+               << "set -e\n"
+               << "cd \"" << build_root.string() << "\"\n"
+               << "echo '=== Build environment ==='\n"
+               << "ls -lah\n"    // Properly terminated command
+               << "pwd\n"        // Properly terminated command
+               << "echo '========================='\n";
+
+            for (const auto& cmd : commands) {
+                script << "echo '▶▶ Running: " << cmd << "'\n"
+                       << cmd << "\n";
+            }
+        }
+
+        // Make script executable
+        fs::permissions(script_path,
+            fs::perms::owner_all | fs::perms::group_read | fs::perms::others_read,
+            fs::perm_options::replace);
+
+        // Execute with fakeroot in clean environment
+        const std::string full_cmd = "fakeroot -- sh \"" + script_path.string() + "\"";
+        const int result = std::system(full_cmd.c_str());
+
+        // Cleanup script
+        fs::remove(script_path);
+
+        if (result != 0) {
+            throw std::runtime_error(phase + " commands failed with exit code " + std::to_string(result));
+        }
+    }
+
+    void generateAnemonixYaml() {
+        std::ofstream yaml(anemo_pack_dir / "anemonix.yaml");
+        yaml << "name: " << pkg.name << "\n"
+             << "version: " << pkg.version << "\n"
+             << "arch: " << pkg.arch << "\n"
+             << "description: " << pkg.description << "\n"
+             << "dependencies:\n";
+        for (const auto& dep : pkg.deps) {
+            yaml << "  - " << dep << "\n";
+        }
+        yaml.close();
+    }
+
+    void writeScripts() {
+        auto writeScript = [this](const std::vector<std::string>& lines, const std::string& name) {
+            if (lines.empty()) return;
+            std::ofstream script(anemo_pack_dir / (name + ".anemonix"));
+            for (const auto& line : lines) {
+                script << line << "\n";
+            }
+        };
+
+        writeScript(pkg.pre_install_script, "preinstall");
+        writeScript(pkg.post_install_script, "postinstall");
+        writeScript(pkg.pre_remove_script, "preremove");
+        writeScript(pkg.post_remove_script, "postremove");
+    }
+
+    void createPackage() {
+        // Copy built files
+        fs::copy(build_root / "install", anemo_pack_dir / "package", fs::copy_options::recursive);
+
+        // Create tarball
+        std::string tar_cmd = "tar czf " + final_pkg_path.string() + " -C " +
+                             anemo_pack_dir.string() + " .";
+        int result = std::system(tar_cmd.c_str());
+        if (result != 0) {
+            throw std::runtime_error("Failed to create package tarball");
+        }
+    }
+
+    void cleanUp() {
+        fs::remove_all(build_root);
+        fs::remove_all(anemo_pack_dir);
+    }
+
+    void build() {
+        try {
+            if (!checkDependencies()) return;
+
+            createBuildDirs();
+            downloadAndPrepareSource();
+
+            executeCommands(pkg.pre_build_commands, "pre-build");
+            executeCommands(pkg.build_commands, "build");
+            executeCommands(pkg.post_build_commands, "post-build");
+
+            generateAnemonixYaml();
+            writeScripts();
+            createPackage();
+            //cleanUp();
+
+            std::cout << "Package built successfully: " << final_pkg_path << "\n";
+        } catch (const std::exception& e) {
+            std::cerr << "Build failed: " << e.what() << "\n";
+            cleanUp();
+            exit(EXIT_FAILURE);
+        }
+    }
+};
+
+// Usage:
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        std::cerr << "Usage: dendro-build <specfile>\n";
+        return EXIT_FAILURE;
+    }
+
+    Parser parser;
+    Package pkg = Parser::parseSpec(argv[1]);
+    pkg.print();
+
+    BuildSystem builder(pkg);
+    builder.build();
+
+    return EXIT_SUCCESS;
 }

@@ -1,44 +1,23 @@
 [metadata]
-name: "package"
-author: "elemOS team"
+name: "acl"
+author: "noGNU savannah.org"
 arch: "x86_64"
-version: 1.0
-build_deps: {glibc<=4.2,test-lib=0.1,test-test>=14.2}
-description: "test-package"
-license: "GPLv3"
+version: 2.3.2
+build_deps: {attr}
+description: "Access control list utilities, libraries and headers"
+license: "LGPL"
+source: "http://www.mirrorservice.org/sites/download.savannah.gnu.org/releases/acl/acl-2.3.2.tar.xz"
 
 # anemo metadata
-provides: {pkg.so=1,pkg-test.so.1}
-conflicts: {package-old,test-old}
-replaces: {package-old}
+provides: {libacl.so=1-64, xfsacl}
+conflicts: {xfsacl}
+replaces: {xfsacl}
 protected: true
-deps: {yaml-cpp=0.8.0,sqlite3>=3.4.0,glibc>=14.0}
+deps: {glibc}
 [/metadata]
 
-
-[pre-build-commands]
-make clean
-make -j16
-make install
-[/pre-build-commands]
-
-[post-build-commands]
-echo "good!"
-chown /test/test.txt
-[/post-build-commands]
-
-[pre-install-script]
-echo "preparing for install!"
-[/pre-install-script]
-
-[post-install-script]
-echo "package installed!"
-[/post-install-script]
-
-[pre-remove-script]
-echo "preparing for removal!"
-[/pre-remove-script]
-
-[post-remove-script]
-echo "package removed!"
-[/post-remove-script]
+[build-commands]
+./configure
+make
+make install DESTDIR=&dendro_buildroot/install
+[/build-commands]
