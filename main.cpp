@@ -26,7 +26,7 @@ public:
         final_pkg_path = fs::current_path() / (pkg.name + "-" + pkg.version + ".apkg");
     }
     // TODO implement anemo list in Anemo pkg manager
-    bool checkDependencies() {
+    static bool checkDependencies() {
         // std::cout << "Checking build dependencies...\n";
         // for (const auto& dep : pkg.build_deps) {
         //     int result = std::system(("anemo info " + dep + " > /dev/null 2>&1").c_str());
@@ -48,7 +48,7 @@ public:
         return fwrite(ptr, size, nmemb, stream);
     }
 
-    void importGpgKeys(const std::vector<std::string>& keyIds) {
+    void importGpgKeys(const std::vector<std::string>& keyIds) const {
         // Create temporary keyring directory
         const fs::path keyringDir = fs::path("/var/dendro/keyrings/" + pkg.name) / "temp_keyring";
         fs::create_directories(keyringDir);
@@ -59,14 +59,26 @@ public:
 
         for (const auto& keyId : keyIds) {
             // First try to receive the key from keyserver
-            std::string fetchCmd = "gpg " + keyringOpt +
-                                 " --keyserver hkps://keyserver.ubuntu.com" +
-                                 " --recv-keys " + keyId + " 2>&1";
+            std::vector<std::string> keyservers = {
+                "hkps://keyserver.ubuntu.com",
+                "hkps://keys.openpgp.org",
+                "hkps://pgp.mit.edu"
+            };
 
-            // Execute and check result
-            if (std::system(fetchCmd.c_str()) != 0) {
+            bool keyFetched = false;
+            for (const auto& keyserver : keyservers) {
+                std::string fetchCmd = "gpg " + keyringOpt +
+                                     " --keyserver " + keyserver +
+                                     " --recv-keys " + keyId + " 2>&1";
+                if (std::system(fetchCmd.c_str()) == 0) {
+                    keyFetched = true;
+                    break;
+                }
+            }
+
+            if (!keyFetched) {
                 fs::remove_all(keyringDir);
-                throw std::runtime_error("Failed to fetch key: " + keyId);
+                throw std::runtime_error("Failed to fetch key from all keyservers: " + keyId);
             }
 
             // Trust key ultimately in temporary keyring
