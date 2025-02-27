@@ -153,15 +153,16 @@ static bool downloadUrl(const std::string& url, const std::string& outputFile) {
             }
 
             // Verify signed tag if requested
-            if (signedTag) {
-                setenv("GNUPGHOME", keyringDir.c_str(), 1);
-                std::string verifyCmd = "git -C " + build_root.string() +
-                                       " verify-tag " + tag;
-
-                if (std::system(verifyCmd.c_str()) != 0) {
-                    throw std::runtime_error("Tag verification failed: " + tag);
-                }
-            }
+            // disable until anemo-keyring
+            // if (signedTag) {
+            //     setenv("GNUPGHOME", keyringDir.c_str(), 1);
+            //     std::string verifyCmd = "git -C " + build_root.string() +
+            //                            " verify-tag " + tag;
+            //
+            //     if (std::system(verifyCmd.c_str()) != 0) {
+            //         throw std::runtime_error("Tag verification failed: " + tag);
+            //     }
+            // }
         }
         catch (...) {
             fs::remove_all(build_root);
