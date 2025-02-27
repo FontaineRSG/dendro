@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
+#include <regex>
 #include <vector>
 #include "Package.h"
 #include "Parser.h"
@@ -77,18 +78,46 @@ static bool downloadUrl(const std::string& url, const std::string& outputFile) {
     return res == CURLE_OK;
 }
 
+    void handleGitSource(const std::string& sourceUrl) {
+        // Extract base URL and tag/branch
+        std::regex pattern(R"(^(git\+)?(https?://.+?)(\?signed)?#tag=([\w\.-]+))");
+        std::smatch matches;
+
+        if (!std::regex_match(sourceUrl, matches, pattern)) {
+            throw std::runtime_error("Invalid Git source format: " + sourceUrl);
+        }
+
+        const std::string repoUrl = matches[2].str();
+        const std::string tag = matches[4].str();
+
+        // Clone repository
+        std::string cloneCmd = "git clone --depth 1 --branch " + tag + " " +
+                              repoUrl + " " + build_root.string();
+
+        if (std::system(cloneCmd.c_str()) != 0) {
+            throw std::runtime_error("Failed to clone repository: " + repoUrl);
+        }
+
+        // Verify signed tag if requested
+        if (matches[3].matched) {
+            std::string verifyCmd = "git -C " + build_root.string() +
+                                   " tag -v " + tag;
+            if (std::system(verifyCmd.c_str()) != 0) {
+                fs::remove_all(build_root);
+                throw std::runtime_error("Failed to verify signed tag: " + tag);
+            }
+        }
+    }
+
 void downloadAndPrepareSource() {
     if (pkg.source.empty()) return;
 
-    // Handle Git repositories
+    // Handle Git repositories with signed tags
     if (pkg.source.find("git+") == 0) {
-        std::string repoUrl = pkg.source.substr(4);
-        std::string command = "git clone --depth 1 " + repoUrl + " " + build_root.string();
-        if (std::system(command.c_str()) != 0) {
-            throw std::runtime_error("Failed to clone Git repository: " + repoUrl);
-        }
+        handleGitSource(pkg.source);
         return;
     }
+
 
     // Handle tar archives
     if (pkg.source.find("tar+") == 0) {
