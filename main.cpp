@@ -18,6 +18,7 @@ class BuildSystem {
     fs::path build_root;
     fs::path anemo_pack_dir;
     fs::path final_pkg_path;
+    const fs::path keyringDir = fs::path("/var/dendro/keyrings/" + pkg.name) / "temp_keyring";
 
 public:
     explicit BuildSystem(const Package& package) : pkg(package) {
@@ -50,7 +51,6 @@ public:
 
     void importGpgKeys(const std::vector<std::string>& keyIds) const {
         // Create temporary keyring directory
-        const fs::path keyringDir = fs::path("/var/dendro/keyrings/" + pkg.name) / "temp_keyring";
         fs::create_directories(keyringDir);
 
         // Set custom keyring location
@@ -133,7 +133,7 @@ static bool downloadUrl(const std::string& url, const std::string& outputFile) {
         if (!std::regex_match(sourceUrl, matches, pattern)) {
             throw std::runtime_error("Invalid Git source format: " + sourceUrl);
         }
-
+        setenv("GNUPGHOME", keyringDir.c_str(), 1);
         const std::string repoUrl = matches[1].str();
         const bool signedTag = matches[2].matched;
         const std::string tag = matches[3].str();
@@ -154,6 +154,7 @@ static bool downloadUrl(const std::string& url, const std::string& outputFile) {
 
             // Verify signed tag if requested
             if (signedTag) {
+                setenv("GNUPGHOME", keyringDir.c_str(), 1);
                 std::string verifyCmd = "git -C " + build_root.string() +
                                        " verify-tag " + tag;
 
