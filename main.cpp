@@ -47,50 +47,89 @@ public:
         return fwrite(ptr, size, nmemb, stream);
     }
 
-    void downloadAndPrepareSource() {
-        if (pkg.source.empty()) return;
 
-        // Check if source is local directory
-        if (fs::exists(pkg.source) && fs::is_directory(pkg.source)) {
-            fs::copy(pkg.source, build_root, fs::copy_options::recursive);
-            return;
-        }
+static bool downloadUrl(const std::string& url, const std::string& outputFile) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return false;
 
-        // Handle URL source
-        CURL* curl = curl_easy_init();
-        if (curl) {
-            FILE* fp = fopen("temp_source.tar", "wb");
-
-            // Set curl options
-            curl_easy_setopt(curl, CURLOPT_URL, pkg.source.c_str());
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-
-            // Handle redirects like -L flag
-            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);  // Enable redirect following
-            curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);      // Maximum 10 redirects
-
-            // GitHub requires a user-agent header
-            struct curl_slist *headers = NULL;
-            headers = curl_slist_append(headers, "User-Agent: DendroBuildSystem");
-            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-            CURLcode res = curl_easy_perform(curl);
-
-            // Cleanup
-            curl_slist_free_all(headers);
-            fclose(fp);
-            curl_easy_cleanup(curl);
-
-            if (res == CURLE_OK) {
-                extractAndFlattenTarball();
-                fs::remove("temp_source.tar");
-            } else {
-                std::cerr << "Download failed: " << curl_easy_strerror(res) << "\n";
-                throw std::runtime_error("Source download failed");
-            }
-        }
+    FILE* fp = fopen(outputFile.c_str(), "wb");
+    if (!fp) {
+        curl_easy_cleanup(curl);
+        return false;
     }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
+
+    struct curl_slist* headers = nullptr;
+    headers = curl_slist_append(headers, "User-Agent: DendroBuildSystem");
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    CURLcode res = curl_easy_perform(curl);
+
+    curl_slist_free_all(headers);
+    fclose(fp);
+    curl_easy_cleanup(curl);
+
+    return res == CURLE_OK;
+}
+
+void downloadAndPrepareSource() {
+    if (pkg.source.empty()) return;
+
+    // Handle Git repositories
+    if (pkg.source.find("git+") == 0) {
+        std::string repoUrl = pkg.source.substr(4);
+        std::string command = "git clone --depth 1 " + repoUrl + " " + build_root.string();
+        if (std::system(command.c_str()) != 0) {
+            throw std::runtime_error("Failed to clone Git repository: " + repoUrl);
+        }
+        return;
+    }
+
+    // Handle tar archives
+    if (pkg.source.find("tar+") == 0) {
+        std::string tarUrl = pkg.source.substr(4);
+        if (!downloadUrl(tarUrl, "temp_source.tar")) {
+            throw std::runtime_error("Failed to download tar archive: " + tarUrl);
+        }
+        extractAndFlattenTarball();
+        fs::remove("temp_source.tar");
+        return;
+    }
+
+    // Handle local files
+    if (pkg.source.find("local+") == 0) {
+        fs::path sourcePath = pkg.source.substr(6);
+
+        if (!fs::exists(sourcePath)) {
+            throw std::runtime_error("Local path does not exist: " + sourcePath.string());
+        }
+
+        if (fs::is_directory(sourcePath)) {
+            fs::copy(sourcePath, build_root, fs::copy_options::recursive);
+        } else {
+            fs::copy(sourcePath, build_root / sourcePath.filename());
+        }
+        return;
+    }
+
+    // Existing handling for regular URLs and local directories
+    if (fs::exists(pkg.source) && fs::is_directory(pkg.source)) {
+        fs::copy(pkg.source, build_root, fs::copy_options::recursive);
+        return;
+    }
+
+    // Handle regular URLs
+    if (!downloadUrl(pkg.source, "temp_source.tar")) {
+        throw std::runtime_error("Failed to download source: " + pkg.source);
+    }
+    extractAndFlattenTarball();
+    fs::remove("temp_source.tar");
+}
 
 
     void extractAndFlattenTarball() {

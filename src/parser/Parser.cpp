@@ -156,7 +156,7 @@ std::vector<std::string> splitIfBraced(const std::string &s, const int line) {
             result.push_back(s.substr(start, end - start));
             start = end + 1;
         }
-        result.push_back(s.substr(start, s.size() - start - 1)); // Last element, ignore `}`
+        result.push_back(ltrim(s.substr(start, s.size() - start - 1))); // Last element, ignore `}`
         return result;
     }
     return {s}; // Not a braced list, return single-element vector
