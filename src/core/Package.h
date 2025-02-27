@@ -22,13 +22,14 @@ class Package {
     std::vector<std::string> replaces;
     std::vector<std::string> deps;
     std::vector<std::string> build_commands;
-    bool is_protected;
+    bool is_protected = false;
 
     std::vector<std::string> pre_build_commands;
     std::vector<std::string> post_build_commands;
     std::vector<std::string> pre_install_script, post_install_script;
     std::vector<std::string> pre_remove_script, post_remove_script;
     std::string source;
+    std::vector<std::string> validpgpkeys;
     Package(
         std::string name,
         std::string author,
@@ -48,9 +49,10 @@ class Package {
         std::vector<std::string> post_install_script,
         std::vector<std::string> pre_remove_script,
         std::vector<std::string> post_remove_script,
-        std::string source
+        std::string source,
+        std::vector<std::string> validpgpkeys
     );
-    Package(){};
+    Package()= default;
 
     ~Package() {
         provides.clear();

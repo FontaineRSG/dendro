@@ -48,6 +48,41 @@ public:
         return fwrite(ptr, size, nmemb, stream);
     }
 
+    void importGpgKeys(const std::vector<std::string>& keyIds) {
+        // Create temporary keyring directory
+        const fs::path keyringDir = build_root / "temp_keyring";
+        fs::create_directories(keyringDir);
+
+        // Set custom keyring location
+        const std::string keyringOpt = "--no-default-keyring --keyring " +
+                                      (keyringDir / "trustedkeys.gpg").string();
+
+        for (const auto& keyId : keyIds) {
+            // First try to receive the key from keyserver
+            std::string fetchCmd = "gpg " + keyringOpt +
+                                 " --keyserver hkps://keyserver.ubuntu.com" +
+                                 " --recv-keys " + keyId + " 2>&1";
+
+            // Execute and check result
+            if (std::system(fetchCmd.c_str()) != 0) {
+                fs::remove_all(keyringDir);
+                throw std::runtime_error("Failed to fetch key: " + keyId);
+            }
+
+            // Trust key ultimately in temporary keyring
+            std::string trustCmd = "echo \"" + keyId +
+                                 ":6:\" | gpg " + keyringOpt +
+                                 " --import-ownertrust 2>/dev/null";
+            if (std::system(trustCmd.c_str()) != 0) {
+                fs::remove_all(keyringDir);
+                throw std::runtime_error("Failed to trust key: " + keyId);
+            }
+        }
+
+        // Set environment variable for git to use our temporary keyring
+        setenv("GNUPGHOME", keyringDir.c_str(), 1);
+    }
+
 
 static bool downloadUrl(const std::string& url, const std::string& outputFile) {
     CURL* curl = curl_easy_init();
@@ -78,43 +113,56 @@ static bool downloadUrl(const std::string& url, const std::string& outputFile) {
     return res == CURLE_OK;
 }
 
-    void handleGitSource(const std::string& sourceUrl) {
-        // Extract base URL and tag/branch
-        std::regex pattern(R"(^(git\+)?(https?://.+?)(\?signed)?#tag=([\w\.-]+))");
+    void handleGitSource(const std::string& sourceUrl,
+                    const std::vector<std::string>& validPgpKeys) {
+        std::regex pattern(R"(git\+(https?://.+?)(\?signed)?#tag=([\w\.-]+))");
         std::smatch matches;
 
         if (!std::regex_match(sourceUrl, matches, pattern)) {
             throw std::runtime_error("Invalid Git source format: " + sourceUrl);
         }
 
-        const std::string repoUrl = matches[2].str();
-        const std::string tag = matches[4].str();
+        const std::string repoUrl = matches[1].str();
+        const bool signedTag = matches[2].matched;
+        const std::string tag = matches[3].str();
 
-        // Clone repository
-        std::string cloneCmd = "git clone --depth 1 --branch " + tag + " " +
-                              repoUrl + " " + build_root.string();
-
-        if (std::system(cloneCmd.c_str()) != 0) {
-            throw std::runtime_error("Failed to clone repository: " + repoUrl);
-        }
-
-        // Verify signed tag if requested
-        if (matches[3].matched) {
-            std::string verifyCmd = "git -C " + build_root.string() +
-                                   " tag -v " + tag;
-            if (std::system(verifyCmd.c_str()) != 0) {
-                fs::remove_all(build_root);
-                throw std::runtime_error("Failed to verify signed tag: " + tag);
+        try {
+            // Import keys if needed
+            if (signedTag && !validPgpKeys.empty()) {
+                importGpgKeys(validPgpKeys);
             }
+
+            // Clone with full history for tag verification
+            std::string cloneCmd = "git clone --branch " + tag +
+                                  " " + repoUrl + " " + build_root.string();
+
+            if (std::system(cloneCmd.c_str()) != 0) {
+                throw std::runtime_error("Clone failed: " + repoUrl);
+            }
+
+            // Verify signed tag if requested
+            if (signedTag) {
+                std::string verifyCmd = "git -C " + build_root.string() +
+                                       " verify-tag " + tag;
+
+                if (std::system(verifyCmd.c_str()) != 0) {
+                    throw std::runtime_error("Tag verification failed: " + tag);
+                }
+            }
+        }
+        catch (...) {
+            fs::remove_all(build_root);
+            throw;
         }
     }
 
 void downloadAndPrepareSource() {
     if (pkg.source.empty()) return;
+        const std::vector<std::string>& validPgpKeys = pkg.validpgpkeys;
 
     // Handle Git repositories with signed tags
     if (pkg.source.find("git+") == 0) {
-        handleGitSource(pkg.source);
+        handleGitSource(pkg.source, validPgpKeys);
         return;
     }
 
