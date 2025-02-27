@@ -229,6 +229,7 @@ void parseMetadata(const std::vector<std::string>& data, Package& pkg) {
     pkg.deps = vectorMetadata["deps"];
     pkg.replaces = vectorMetadata["replaces"];
     pkg.source = metadata["source"];
+    pkg.validpgpkeys = metadata["validpgpkeys"];
 }
 
 Package Parser::parseSpec(const std::filesystem::path& path) {
