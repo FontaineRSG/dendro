@@ -50,7 +50,7 @@ public:
 
     void importGpgKeys(const std::vector<std::string>& keyIds) {
         // Create temporary keyring directory
-        const fs::path keyringDir = build_root / "temp_keyring";
+        const fs::path keyringDir = fs::path("/var/dendro/keyrings/" + pkg.name) / "temp_keyring";
         fs::create_directories(keyringDir);
 
         // Set custom keyring location
