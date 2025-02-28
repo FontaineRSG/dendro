@@ -1,0 +1,56 @@
+https://elemos.org/repos/
+
+core/ ->
+   repo.db (sqlite)
+   acl.apkg
+   atrr.apkg
+
+repo.db ->
+
+table 1: package ->                                                                                                                  true-bin
++---------+---------+---------+---------+------------+------+---------+--------+----------+-----------+----------+------+-----------+---------+
+|  name   |  author |  arch   | version | build_deps | desc | license | source | provides | conflicts | replaces | deps | protected |  type   |
++---------+---------+---------+---------+------------+------+---------+--------+----------+-----------+----------+------+-----------+---------+
+| VARCHAR | VARCHAR | VARCHAR | VARCHAR |    TEXT    | TEXT | VARCHAR |  TEXT  |   TEXT   |    TEXT   |   TEXT   | TEXT |  BOOLEAN  | BOOLEAN |
++---------+---------+---------+---------+------------+------+---------+--------+----------+-----------+----------+------+-----------+---------+
+|  anemo  |   cv2   |   x64   |  2.1.5  |  yaml-cpp, | pkg  |  GPLv3  | https: |  anemo-  | anemo-ep  | anemo-ep | some,|   TRUE    |  TRUE   |
+|         |         |         |         |   sqlite3, | man  |         | //git  |  epoch-  | och-1     | och-1    | deps |           |         |
+|         |         |         |         |     fmt,   | ager |         | hub..  |    2     |           |          |      |           |         |
++---------+---------+---------+---------+------------+------+---------+--------+----------+-----------+----------+------+-----------+---------+
+
+table 2: repo ->
++---------+---------+----------+------+---------+
+|  name   |  arch   | packages | keys |  type   |
++---------+---------+----------+------+---------+
+| VARCHAR | VARCHAR |   TEXT   | TEXT | VARCHAR |
++---------+---------+----------+------+---------+
+|  core   |   x64   |{acl,attr}|  PGP | system  | <--- our
+| extern  |   x64   |  {steam} |  PGP | extern  | <--- extra (other people)
++---------+---------+----------+------+---------+
+
+
+server:
+lang (js) (express)
+
+endpoints
+base url = https:elemOS.org/
+get:
+1. anemo sync                 <--- no args
+base url /api/v1/syncrepo
+
+2. fetch pkg                  <--- package_name
+base url /api/v1/package_name
+
+post:
+1. add pkg
+base url /api/v1/addpkg       <---- auth only!!!
+args:
+name | author | arch | version | build_deps | desc | license | source | provides | conflicts | replaces | deps | protected | type
+file: pkg_name.apkg
+
+if auth:
+repo.db -> add pkg
+(sign) -> sign with pgp key (reserved)
+
+if not auth:
+return 401 -> unauthorized

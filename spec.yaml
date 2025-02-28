@@ -1,0 +1,56 @@
+name: "systemd"
+author: "redhat"
+arch: "x86_64"
+version: 237
+build_deps: [some,build,deps]
+description: "systemd init system"
+license: "LGPL"
+sources: ["tar+source1.org","git+github.com/systemd/systemd","local+/home/cv2/systemd"]
+build_script: "build-systemd.sh"
+anemo_script: "anemo-systemd.sh"
+
+# anemo metadata
+provides: [systemd.so=1,systemd.lib=257]
+conflicts: [openrc]
+replaces: [openrc]
+protected: true
+deps: [some,deps]
+
+splits: # <-variant
+  systemd-sysvcompat:
+    name: "systemd-sysvcompat"
+    author: "redhat"
+    arch: "x86_64"
+    version: 237
+    build_deps: [ some,build,deps ]
+    description: "systemd init system compat layer for sysv"
+    license: "LGPL"
+    sources: [ "tar+source1.org","git+github.com/systemd/systemd","local+/home/cv2/systemd" ]
+    build_script: "build-systemd-sysvcompat.sh"
+    anemo_script: "anemo-systemd-sysvcompat.sh"
+
+    # anemo metadata
+    provides: [ systemd-sysv]
+    conflicts: [ openrc ]
+    replaces: [ openrc ]
+    protected: true
+    deps: [ some,deps ]
+
+  systemd-libs:
+    name: "systemd-libs"
+    author: "redhat"
+    arch: "x86_64"
+    version: 237
+    build_deps: [ some,build,deps ]
+    description: "systemd init system libs"
+    license: "LGPL"
+    sources: [ "tar+source1.org","git+github.com/systemd/systemd","local+/home/cv2/systemd" ]
+    build_script: "build-systemd-libs.sh"
+    anemo_script: "anemo-systemd-libs.sh"
+
+    # anemo metadata
+    provides: [ systemd.so=1,systemd.lib=257 ]
+    conflicts: [ openrc ]
+    replaces: [ openrc ]
+    protected: true
+    deps: [ some,deps ]
