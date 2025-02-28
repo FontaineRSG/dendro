@@ -25,8 +25,7 @@ void BuildSystem::handleGitSource(const std::string& sourceUrl,
         }
 
         std::string cloneCmd;
-
-        std::string clonePath = "/var/dendro/tempclone";
+        std::string clonePath = "/var/dendro/tempclone/" + pkg.name + pkg.version;
 
         if (!tag.empty()){
             // Clone with full history for tag verification
