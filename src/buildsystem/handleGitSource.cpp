@@ -42,7 +42,8 @@ void BuildSystem::handleGitSource(const std::string& sourceUrl,
             throw std::runtime_error("Clone failed: " + repoUrl);
         }
 
-        fs::copy(clonePath, build_root.string(),  fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+        //fs::copy(clonePath, build_root.string(),  fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+        system(("rsync -avL " + clonePath + " " + build_root.string()).c_str());
         fs::remove_all(clonePath);
 
         // Verify signed tag if requested
