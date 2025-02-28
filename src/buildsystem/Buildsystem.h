@@ -70,7 +70,7 @@ public:
 
     void downloadAndPrepareSource();
 
-    bool downloadUrl(const std::string &url, const std::string &outputFile);
+    static bool downloadUrl(const std::string &url, const std::string &outputFile);
 
     void process_package(const Package &pkg);
 
