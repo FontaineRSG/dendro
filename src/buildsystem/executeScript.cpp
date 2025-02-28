@@ -29,6 +29,7 @@ int BuildSystem::execute_script(const std::string &script_path, const std::strin
 
         // Build the source-and-execute command
         std::string command = "source " + script_path + " && " + function_name;
+        std::cout << "sourcing: " << command << std::endl;
         for (const auto& arg : args) {
             command += " " + arg;
         }
