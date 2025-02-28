@@ -24,13 +24,26 @@ void BuildSystem::handleGitSource(const std::string& sourceUrl,
             importGpgKeys(validPgpKeys);
         }
 
-        // Clone with full history for tag verification
-        std::string cloneCmd = "git clone --branch " + tag +
-                              " " + repoUrl + " " + build_root.string();
+        std::string cloneCmd;
 
+        std::string clonePath = "/var/dendro/tempclone";
+
+        if (!tag.empty()){
+            // Clone with full history for tag verification
+            cloneCmd = "git clone --branch " + tag +
+                                   " " + repoUrl + " " + clonePath;
+        } else {
+            cloneCmd = "git clone " +
+                    repoUrl + " " + clonePath;
+        }
+
+        std::cout << "running clone: " << cloneCmd << std::endl;
         if (std::system(cloneCmd.c_str()) != 0) {
             throw std::runtime_error("Clone failed: " + repoUrl);
         }
+
+        fs::copy(clonePath, build_root.string(), fs::copy_options::overwrite_existing);
+        fs::remove_all(clonePath);
 
         // Verify signed tag if requested
         // disable until anemo-keyring

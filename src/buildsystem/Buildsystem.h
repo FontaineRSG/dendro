@@ -23,7 +23,7 @@ class BuildSystem {
 public:
     // Constructor for main package
     explicit BuildSystem(const Package& package)
-        : is_variant(false),
+        :
           build_root(fs::path("/var/dendro") / package.name / "buildroot"),
           anemo_pack_dir(fs::path("/var/dendro") / package.name / "anemopack"),
           final_pkg_path(fs::current_path() / (package.name + "-" + package.version + ".apkg")),
@@ -38,9 +38,12 @@ public:
             fs::create_directories(fs::path("/var/dendro") / pkg.name / "anemopack/package");
         }
         pkg.print(false);
+        std::cout << "creating buildroot: " << build_root << std::endl;
         fs::create_directories(build_root);
+        std::cout << "creating anemopack dir: " << anemo_pack_dir << std::endl;
         fs::create_directories(anemo_pack_dir);
         // Create packaging directories for all
+        std::cout << "creating final path: " << final_pkg_path<< std::endl;
         fs::create_directories(final_pkg_path.parent_path());
         fs::create_directories(keyring_dir);
     }
