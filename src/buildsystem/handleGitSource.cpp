@@ -38,10 +38,11 @@ void BuildSystem::handleGitSource(const std::string& sourceUrl,
 
         std::cout << "running clone: " << cloneCmd << std::endl;
         if (std::system(cloneCmd.c_str()) != 0) {
+            fs::remove_all(clonePath);
             throw std::runtime_error("Clone failed: " + repoUrl);
         }
 
-        fs::copy(clonePath, build_root.string(),  fs::copy_options::recursive);
+        fs::copy(clonePath, build_root.string(),  fs::copy_options::recursive | fs::copy_options::overwrite_existing);
         fs::remove_all(clonePath);
 
         // Verify signed tag if requested

@@ -25,4 +25,3 @@ package() {
   /usr/bin/install -Dm644 btrfs-scrub@.service "${dendro_installloc}/usr/lib/systemd/system/btrfs-scrub@.service"
   /usr/bin/install -Dm644 btrfs-scrub@.timer "${dendro_installloc}/usr/lib/systemd/system/btrfs-scrub@.timer"
 }
-
