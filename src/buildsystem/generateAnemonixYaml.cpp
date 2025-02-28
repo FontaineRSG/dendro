@@ -16,5 +16,17 @@ void BuildSystem::generateAnemonixYaml() {
     for (const auto& dep : pkg.deps) {
         yaml << "  - " << dep << "\n";
     }
+    yaml << "provides:";
+    for (const auto& provide : pkg.provides) {
+        yaml << "  - " << provide << "\n";
+    }
+
+
+
+    yaml << "conflicts:\n";
+    for (const auto& confl : pkg.conflicts) {
+        yaml << "  - " << confl << "\n";
+    }
+
     yaml.close();
 }
