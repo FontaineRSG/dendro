@@ -20,6 +20,7 @@ int BuildSystem::execute_script(const std::string &script_path, const std::strin
     // Build the command structure
     if (function_name.empty()) {
         // Regular script execution
+
         cmd_args.emplace_back("bash");
         cmd_args.push_back(script_path);
     } else {

@@ -28,15 +28,15 @@ void BuildSystem::build(bool use_fakeroot) {
             // execute prebuild script
             if(execute_script(variant.build_script, "prepare", use_fakeroot, {""}) != 0) {
                 throw std::runtime_error("err: prepare function failed");
-            };
+            }
 
             if(execute_script(variant.build_script, "build", use_fakeroot, {""}) != 0) {
                 throw std::runtime_error("err: build function failed");
-            };
+            }
 
             if(execute_script(variant.build_script, "install", use_fakeroot, {""}) != 0)  {
                 throw std::runtime_error("err: install function failed");
-            };
+            }
         }
 
         createPackage();
