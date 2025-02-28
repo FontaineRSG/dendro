@@ -21,11 +21,14 @@ void BuildSystem::generateAnemonixYaml() {
         yaml << "  - " << provide << "\n";
     }
 
-
-
     yaml << "conflicts:\n";
     for (const auto& confl : pkg.conflicts) {
         yaml << "  - " << confl << "\n";
+    }
+
+    yaml << "replaces:\n";
+    for (const auto& rep : pkg.replaces) {
+        yaml << "  - " << rep << "\n";
     }
 
     yaml.close();

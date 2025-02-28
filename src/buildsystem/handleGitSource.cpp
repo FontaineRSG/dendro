@@ -7,7 +7,7 @@
 
 void BuildSystem::handleGitSource(const std::string& sourceUrl,
                                   const std::vector<std::string>& validPgpKeys) {
-    std::regex pattern(R"(git\+(https?://.+?)(\?signed)?#tag=([\w\.-]+))");
+    std::regex pattern(R"(git\+(https?://.+?)(\?signed)?(?:#tag=([\w\.-]+))?)");
     std::smatch matches;
 
     if (!std::regex_match(sourceUrl, matches, pattern)) {

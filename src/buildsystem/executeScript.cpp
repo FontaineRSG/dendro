@@ -5,6 +5,7 @@
 #include <string>
 #include <unistd.h>
 #include "Buildsystem.h"
+#include <sys/wait.h>
 
 // Modified execute_script with environment variables
 int BuildSystem::execute_script(const std::string &script_path, const std::string &function_name,
