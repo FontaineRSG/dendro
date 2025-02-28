@@ -15,7 +15,7 @@ void BuildSystem::processSource(const std::string& source, std::vector<std::stri
     // Handle tar archives
     if (source.find("tar+") == 0) {
         std::string tarUrl = source.substr(4);
-        if (downloadUrl(tarUrl, "temp_source.tar") != CURLE_OK) {
+        if (!downloadUrl(tarUrl, "temp_source.tar")) {
             throw std::runtime_error("Failed to download tar archive: " + tarUrl);
         }
         extractAndFlattenTarball();
