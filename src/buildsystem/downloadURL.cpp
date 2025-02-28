@@ -10,6 +10,7 @@ static size_t writeData(void* ptr, size_t size, size_t nmemb, FILE* stream) {
 }
 
 bool BuildSystem::downloadUrl(const std::string& url, const std::string& outputFile) {
+    std::cout << "downloading source." << std::endl;
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
