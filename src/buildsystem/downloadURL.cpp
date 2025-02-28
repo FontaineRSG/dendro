@@ -30,6 +30,7 @@ bool BuildSystem::downloadUrl(const std::string& url, const std::string& outputF
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     CURLcode res = curl_easy_perform(curl);
+    std::cout << res << std::endl;
 
     curl_slist_free_all(headers);
     fclose(fp);
