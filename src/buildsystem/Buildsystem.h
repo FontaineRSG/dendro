@@ -39,6 +39,7 @@ public:
         }
         pkg.print(false);
         fs::create_directories(build_root);
+        fs::create_directories(anemo_pack_dir);
         // Create packaging directories for all
         fs::create_directories(final_pkg_path.parent_path());
         fs::create_directories(keyring_dir);

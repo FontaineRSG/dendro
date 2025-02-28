@@ -54,3 +54,164 @@ repo.db -> add pkg
 
 if not auth:
 return 401 -> unauthorized
+
+
+
+def parse_srcinfo(content):
+    pkgbase = {}
+    current_pkg = None
+
+    for line in content.split('\n'):
+        line = line.strip()
+
+        if line.startswith('pkgbase ='):
+            current_pkg = 'pkgbase'
+            continue
+
+        if line.startswith('pkgname ='):
+            pkgname = line.split('=', 1)[1].strip()
+            if pkgname not in pkgbase:
+                pkgbase[pkgname] = {
+                    'provides': [],
+                    'conflicts': [],
+                    'replaces': [],
+                    'depends': [],
+                    'description': '',
+                    'arch': ''
+                }
+            current_pkg = pkgname
+
+        if current_pkg:
+            if line.startswith('provides = '):
+                pkgbase[current_pkg]['provides'].append(line.split('=', 1)[1].strip())
+            elif line.startswith('conflicts = '):
+                pkgbase[current_pkg]['conflicts'].append(line.split('=', 1)[1].strip())
+            elif line.startswith('replaces = '):
+                pkgbase[current_pkg]['replaces'].append(line.split('=', 1)[1].strip())
+            elif line.startswith('depends = '):
+                pkgbase[current_pkg]['depends'].append(line.split('=', 1)[1].strip())
+            elif line.startswith('pkgdesc = '):
+                pkgbase[current_pkg]['description'] = line.split('=', 1)[1].strip().strip('"')
+            elif line.startswith('arch = '):
+                pkgbase[current_pkg]['arch'] = line.split('=', 1)[1].strip()
+
+    return pkgbase
+
+def generate_split_entry(pkgname, data, base_data):
+    return {
+        'name': pkgname,
+        'author': base_data['packager'],
+        'arch': data.get('arch', base_data['arch']),
+        'version': base_data['version'],
+        'build_deps': base_data['build_deps'],
+        'description': data['description'],
+        'license': base_data['license'],
+        'sources': base_data['sources'],
+        'build_script': "",
+        'anemo_script': "",
+        'provides': data['provides'],
+        'conflicts': data['conflicts'],
+        'replaces': data['replaces'],
+        'protected': base_data['protected'],
+        'deps': data['depends']
+    }
+
+def main():
+
+    parser = argparse.ArgumentParser(description='Fetch Arch Linux package metadata')
+        parser.add_argument('package', help='Package name')
+        parser.add_argument('--repo', default='core', help='Repository name')
+        parser.add_argument('--arch', default='x86_64', help='Architecture')
+        args = parser.parse_args()
+
+        # Fetch package info
+        api_url = f"https://archlinux.org/packages/search/json/?name={args.package}&arch={args.arch}"
+        try:
+            response = requests.get(api_url, headers=REQUEST_HEADERS)
+            response.raise_for_status()
+            data = response.json()
+        except:
+            print("Error fetching package data")
+            return
+
+        if not data['results']:
+            print(f"Package {args.package} not found")
+            return
+    # ... existing main code until pkg = next((p ... ))
+
+    base_data = {
+        'name': pkgname,
+        'author': pkg['packager'],
+        'arch': args.arch,
+        'version': version,
+        'build_deps': makedepends,
+        'description': pkg['pkgdesc'],
+        'license': ", ".join(pkg['licenses']),
+        'sources': sources,
+        'validpgpkeys': validpgpkeys,
+        'protected': "true" if pkg['repo'].lower() == "core" else "false",
+        'provides': pkg['provides'],
+        'conflicts': pkg['conflicts'],
+        'replaces': pkg['replaces'],
+        'deps': pkg['depends']
+    }
+
+    # Parse split packages from .SRCINFO
+    srcinfo_data = parse_srcinfo(srcinfo_content) if srcinfo_content else {}
+    splits = {}
+
+    for pkgname in srcinfo_data:
+        if pkgname == 'pkgbase' or pkgname == base_data['name']:
+            continue
+
+        split_data = srcinfo_data[pkgname]
+        splits[pkgname] = generate_split_entry(
+            pkgname,
+            split_data,
+            base_data
+        )
+
+    # Generate output
+    output = [
+        'name: "{name}"'.format(**base_data),
+        'author: "{author}"'.format(**base_data),
+        'arch: "{arch}"'.format(**base_data),
+        'version: {version}'.format(**base_data),
+        'build_deps: [{build_deps}]'.format(build_deps=", ".join(base_data['build_deps'])),
+        'description: "{description}"'.format(**base_data),
+        'license: "{license}"'.format(**base_data),
+        'sources: [{sources}]'.format(sources=", ".join(f'"{s}"' for s in base_data['sources'])),
+        'build_script: ""',
+        'anemo_script: ""',
+        '',
+        '# anemo metadata',
+        'provides: [{provides}]'.format(provides=", ".join(f'"{p}"' for p in base_data['provides'])),
+        'conflicts: [{conflicts}]'.format(conflicts=", ".join(f'"{c}"' for c in base_data['conflicts'])),
+        'replaces: [{replaces}]'.format(replaces=", ".join(f'"{r}"' for r in base_data['replaces'])),
+        'protected: {protected}'.format(**base_data),
+        'deps: [{deps}]'.format(deps=", ".join(f'"{d}"' for d in base_data['deps']))
+    ]
+
+    # Add splits if any
+    if splits:
+        output.append('\nsplits:')
+        for split_name, split_data in splits.items():
+            output.append(f'  {split_name}:')
+            output.append(f'    name: "{split_data["name"]}"')
+            output.append(f'    author: "{split_data["author"]}"')
+            output.append(f'    arch: "{split_data["arch"]}"')
+            output.append(f'    version: {split_data["version"]}')
+            output.append(f'    build_deps: [{", ".join(split_data["build_deps"])}]')
+            output.append(f'    description: "{split_data["description"]}"')
+            output.append(f'    license: "{split_data["license"]}"')
+            output.append(f'    sources: [{", ".join(f\'"{s}"\' for s in split_data["sources"])}]')
+            output.append('    build_script: ""')
+            output.append('    anemo_script: ""')
+            output.append('    # anemo metadata')
+            output.append(f'    provides: [{", ".join(f\'"{p}"\' for p in split_data["provides"])}]')
+            output.append(f'    conflicts: [{", ".join(f\'"{c}"\' for c in split_data["conflicts"])}]')
+            output.append(f'    replaces: [{", ".join(f\'"{r}"\' for r in split_data["replaces"])}]')
+            output.append(f'    protected: {split_data["protected"]}')
+            output.append(f'    deps: [{", ".join(f\'"{d}"\' for d in split_data["deps"])}]')
+
+    print('\n'.join(output))
